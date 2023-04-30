@@ -9,9 +9,9 @@ import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 
 interface ITagsRepo {
     function totalTags() external view returns(uint);
-    function tagOne(string memory tagUri) external returns(uint);
-    function tagMulti(string[] memory tagUris) external returns(uint[] memory);
-
+    function tagOne(string memory tagUrl , string memory encryptionKey) external returns(uint);
+    function tagMulti(string[] memory tagUris , string[] memory encryptionKeys) external returns(uint[] memory);
+    function privateKey(uint tokenId) external returns(string memory encryptionKey); 
     event TagCreated(uint tagId, string tagUri);
 }
 
@@ -21,6 +21,7 @@ contract TagsRepo is ITagsRepo, ERC721URIStorage, IERC721Receiver{
     string seedPhrase;
     uint256 nonce;
     uint256 misses;
+    mapping(uint256 => string) encryptionKeyMap;
 
     constructor(string memory _seedPhrase)  ERC721("Altasmir", "ALT") ERC721URIStorage() {
         seedPhrase = _seedPhrase;
@@ -34,7 +35,11 @@ contract TagsRepo is ITagsRepo, ERC721URIStorage, IERC721Receiver{
         return nonce - misses;
     }
 
-    function tagOne(string memory tagUri) external override returns(uint) {
+    function privateKey(uint tokenId) external view override returns(string memory encryptionKey) {
+        return encryptionKeyMap[tokenId];
+    }
+
+    function tagOne(string memory tagUri, string memory encryptionKey) external override returns(uint) {
         nonce = nonce + 1;
         bytes32 tagNumberbytes = keccak256(abi.encode(seedPhrase,nonce));
         uint256 tagNumber = uint256(tagNumberbytes);
@@ -48,12 +53,13 @@ contract TagsRepo is ITagsRepo, ERC721URIStorage, IERC721Receiver{
         }
         _safeMint(address(this), tagNumber);
         _setTokenURI(tagNumber,tagUri);
+        encryptionKeyMap[tagNumber] = encryptionKey;
         emit TagCreated(tagNumber, tagUri);
 
         return(tagNumber);
     }
     
-    function tagMulti(string[] memory tagUris) external override returns(uint256[] memory) {
+    function tagMulti(string[] memory tagUris, string[] memory encryptionKeys) external override returns(uint256[] memory) {
         uint256[] memory ret = new uint256[](tagUris.length);
         bytes32 tagNumberbytes;
         uint256 tagNumber;
@@ -71,6 +77,7 @@ contract TagsRepo is ITagsRepo, ERC721URIStorage, IERC721Receiver{
             }
             _safeMint(address(this), tagNumber);
             _setTokenURI(tagNumber,tagUris[i]);
+            encryptionKeyMap[tagNumber] = encryptionKeys[i]; 
             emit TagCreated(tagNumber, tagUris[i]);
             ret[i] = tagNumber;
         }
